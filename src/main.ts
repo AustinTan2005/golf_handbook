@@ -34,10 +34,10 @@ dirLight.castShadow = true;
 dirLight.shadow.mapSize.set(2048, 2048);
 dirLight.shadow.camera.near = 0.5;
 dirLight.shadow.camera.far = 200;
-dirLight.shadow.camera.left = -50;
-dirLight.shadow.camera.right = 50;
-dirLight.shadow.camera.top = 50;
-dirLight.shadow.camera.bottom = -50;
+(dirLight.shadow.camera as THREE.OrthographicCamera).left = -50;
+(dirLight.shadow.camera as THREE.OrthographicCamera).right = 50;
+(dirLight.shadow.camera as THREE.OrthographicCamera).top = 50;
+(dirLight.shadow.camera as THREE.OrthographicCamera).bottom = -50;
 scene.add(dirLight);
 
 // ─── Ground ──────────────────────────────────────────────────────────────────
@@ -58,7 +58,7 @@ controls.maxDistance = 100;
 controls.maxPolarAngle = Math.PI / 2;
 
 // ─── Animation Mixer ─────────────────────────────────────────────────────────
-let mixer = null;
+let mixer: THREE.AnimationMixer | null = null;
 const clock = new THREE.Clock();
 
 // ─── FBX Loader ──────────────────────────────────────────────────────────────
@@ -68,14 +68,14 @@ const overlay = createLoadingOverlay();
 loader.load(
     '/elmo.fbx',
 
-    (fbx) => {
-        // FBXLoader automatically applies embedded textures — nothing extra needed!
+    (fbx: THREE.Group) => {
         fbx.scale.setScalar(0.1);
 
-        fbx.traverse((child) => {
-            if (child.isMesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
+        fbx.traverse((child: THREE.Object3D) => {
+            if ((child as THREE.Mesh).isMesh) {
+                const mesh = child as THREE.Mesh;
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
             }
         });
 
@@ -93,7 +93,9 @@ loader.load(
         if (fbx.animations?.length > 0) {
             mixer = new THREE.AnimationMixer(fbx);
             mixer.clipAction(fbx.animations[0]).play();
-            if (fbx.animations.length > 1) buildAnimationUI(fbx.animations, mixer);
+            if (fbx.animations.length > 1) {
+                buildAnimationUI(fbx.animations, mixer);
+            }
         }
 
         // Fit camera to model size
@@ -105,21 +107,23 @@ loader.load(
         removeOverlay(overlay);
     },
 
-    (xhr) => {
+    (xhr: ProgressEvent) => {
         if (xhr.lengthComputable) {
             const pct = Math.round((xhr.loaded / xhr.total) * 100);
-            overlay.querySelector('#load-pct').textContent = `${pct}%`;
+            const el = overlay.querySelector('#load-pct');
+            if (el) el.textContent = `${pct}%`;
         }
     },
 
-    (err) => {
+    (err: unknown) => {
         console.error('FBX load error:', err);
-        overlay.querySelector('#load-pct').textContent = 'Failed to load model';
+        const el = overlay.querySelector('#load-pct');
+        if (el) el.textContent = 'Failed to load model';
     }
 );
 
 // ─── Render Loop ─────────────────────────────────────────────────────────────
-function animate() {
+function animate(): void {
     requestAnimationFrame(animate);
     const delta = clock.getDelta();
     if (mixer) mixer.update(delta);
@@ -136,7 +140,7 @@ window.addEventListener('resize', () => {
 });
 
 // ─── UI Helpers ──────────────────────────────────────────────────────────────
-function createLoadingOverlay() {
+function createLoadingOverlay(): HTMLDivElement {
     const div = document.createElement('div');
     div.id = 'loader';
     div.innerHTML = `<div class="spinner"></div><p id="load-pct">Loading...</p>`;
@@ -144,17 +148,20 @@ function createLoadingOverlay() {
     return div;
 }
 
-function removeOverlay(el) {
+function removeOverlay(el: HTMLElement): void {
     el.style.opacity = '0';
     setTimeout(() => el.remove(), 500);
 }
 
-function buildAnimationUI(animations, mixer) {
+function buildAnimationUI(
+    animations: THREE.AnimationClip[],
+    mixer: THREE.AnimationMixer
+): void {
     const ui = document.createElement('div');
     ui.id = 'anim-ui';
     ui.innerHTML = '<strong>Animations</strong>';
 
-    animations.forEach((clip, i) => {
+    animations.forEach((clip: THREE.AnimationClip, i: number) => {
         const btn = document.createElement('button');
         btn.textContent = clip.name || `Clip ${i + 1}`;
         btn.addEventListener('click', () => {

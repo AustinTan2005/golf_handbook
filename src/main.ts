@@ -11,11 +11,9 @@ const BASE_MODEL = '/model_idle.fbx';
 
 const BUTTONS: AnimationButton[] = [
     {
-        label: '🏌️ Drive',
+        label: 'Drive',
         sequence: ['/golf_drive_setup.fbx', '/golf_drive.fbx'],
     },
-    // { label: '🚶 Walk', sequence: ['/walk.fbx'], loop: true },
-    // { label: '👋 Wave', sequence: ['/wave.fbx'] },
 ];
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

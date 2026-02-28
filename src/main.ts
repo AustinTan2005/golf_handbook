@@ -12,7 +12,19 @@ const BASE_MODEL = '/model_idle.fbx';
 const BUTTONS: AnimationButton[] = [
     {
         label: 'Drive',
-        sequence: ['/golf_drive_setup.fbx', '/golf_drive.fbx'],
+        sequence: ['/golf_setup.fbx', '/golf_drive.fbx'],
+    },
+    {
+        label: 'Swing',
+        sequence: ['/golf_setup.fbx', '/golf_swing.fbx'],
+    },
+    {
+        label: 'Putt',
+        sequence: ['/golf_setup.fbx', '/golf_putt.fbx'],
+    },
+    {
+        label: 'Chip',
+        sequence: ['/golf_setup.fbx', '/golf_chip.fbx'],
     },
 ];
 
@@ -28,14 +40,10 @@ interface AnimationButton {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  RESPONSIVE: move #anim-ui in/out of viewer based on screen width
+//  THREE.JS SETUP
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const container = document.getElementById('viewer')!;
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  THREE.JS SETUP
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x1a1a2e);
@@ -211,6 +219,19 @@ loader.load(
                 const mesh = child as THREE.Mesh;
                 mesh.castShadow = true;
                 mesh.receiveShadow = true;
+                mesh.visible = true;
+                const fixMaterial = (m: THREE.Material) => {
+                    m.side = THREE.FrontSide;
+                    m.transparent = false;
+                    m.opacity = 1;
+                    (m as any).alphaTest = 0;
+                    m.needsUpdate = true;
+                };
+                if (Array.isArray(mesh.material)) {
+                    mesh.material.forEach(fixMaterial);
+                } else if (mesh.material) {
+                    fixMaterial(mesh.material as THREE.Material);
+                }
             }
         });
 
@@ -233,7 +254,6 @@ loader.load(
         }
 
         const maxDim = Math.max(size.x, size.y, size.z);
-        // Position camera to nicely frame the model
         camera.position.set(0, size.y * 0.5, maxDim * 1.8);
         controls.target.set(0, size.y * 0.4, 0);
         controls.update();

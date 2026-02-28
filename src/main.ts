@@ -1,46 +1,78 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+import './style.css';
 
-// ─── Scene ───────────────────────────────────────────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  CONFIGURATION — only edit this section
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+const BASE_MODEL = '/model_idle.fbx';
+
+const BUTTONS: AnimationButton[] = [
+    {
+        label: '🏌️ Drive',
+        sequence: ['/golf_drive_setup.fbx', '/golf_drive.fbx'],
+    },
+    // { label: '🚶 Walk', sequence: ['/walk.fbx'], loop: true },
+    // { label: '👋 Wave', sequence: ['/wave.fbx'] },
+];
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  TYPES
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+interface AnimationButton {
+    label: string;
+    sequence: string[];
+    loop?: boolean;
+    fadeIn?: number;
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  RESPONSIVE: move #anim-ui in/out of viewer based on screen width
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+const container = document.getElementById('viewer')!;
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  THREE.JS SETUP
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x1a1a2e);
 scene.fog = new THREE.Fog(0x1a1a2e, 50, 200);
 
-// ─── Camera ──────────────────────────────────────────────────────────────────
-const camera = new THREE.PerspectiveCamera(
-    60,
-    window.innerWidth / window.innerHeight,
-    0.1,
-    1000
-);
+const camera = new THREE.PerspectiveCamera(60, container.clientWidth / container.clientHeight, 0.1, 1000);
 camera.position.set(0, 10, 30);
 
-// ─── Renderer ────────────────────────────────────────────────────────────────
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-document.body.appendChild(renderer.domElement);
+container.appendChild(renderer.domElement);
 
-// ─── Lights ──────────────────────────────────────────────────────────────────
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-scene.add(ambientLight);
+function resizeRenderer(): void {
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    renderer.setSize(w, h);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+}
+resizeRenderer();
+window.addEventListener('resize', resizeRenderer);
 
+scene.add(new THREE.AmbientLight(0xffffff, 0.5));
 const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
 dirLight.position.set(10, 20, 10);
 dirLight.castShadow = true;
 dirLight.shadow.mapSize.set(2048, 2048);
-dirLight.shadow.camera.near = 0.5;
-dirLight.shadow.camera.far = 200;
 (dirLight.shadow.camera as THREE.OrthographicCamera).left = -50;
 (dirLight.shadow.camera as THREE.OrthographicCamera).right = 50;
 (dirLight.shadow.camera as THREE.OrthographicCamera).top = 50;
 (dirLight.shadow.camera as THREE.OrthographicCamera).bottom = -50;
 scene.add(dirLight);
 
-// ─── Ground ──────────────────────────────────────────────────────────────────
 const ground = new THREE.Mesh(
     new THREE.PlaneGeometry(200, 200),
     new THREE.MeshStandardMaterial({ color: 0x16213e })
@@ -49,28 +81,133 @@ ground.rotation.x = -Math.PI / 2;
 ground.receiveShadow = true;
 scene.add(ground);
 
-// ─── Orbit Controls ──────────────────────────────────────────────────────────
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
 controls.minDistance = 5;
 controls.maxDistance = 100;
 controls.maxPolarAngle = Math.PI / 2;
+controls.touches = {
+    ONE: THREE.TOUCH.ROTATE,
+    TWO: THREE.TOUCH.DOLLY_PAN,
+};
 
-// ─── Animation Mixer ─────────────────────────────────────────────────────────
-let mixer: THREE.AnimationMixer | null = null;
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  ANIMATION ENGINE
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+const loader = new FBXLoader();
 const clock = new THREE.Clock();
 
-// ─── FBX Loader ──────────────────────────────────────────────────────────────
-const loader = new FBXLoader();
+let rootModel: THREE.Group | null = null;
+let mixer: THREE.AnimationMixer | null = null;
+let currentAction: THREE.AnimationAction | null = null;
+let idleClip: THREE.AnimationClip | null = null;
+let activePair: HTMLButtonElement[] = [];
+let sequenceToken = 0;
+
+const clipCache = new Map<string, THREE.AnimationClip>();
+
+function preloadClip(file: string): Promise<THREE.AnimationClip> {
+    if (clipCache.has(file)) return Promise.resolve(clipCache.get(file)!);
+    return new Promise((resolve, reject) => {
+        loader.load(
+            file,
+            (fbx: THREE.Group) => {
+                const clip = fbx.animations[0];
+                if (!clip) { reject(new Error(`No animation in ${file}`)); return; }
+                clipCache.set(file, clip);
+                resolve(clip);
+            },
+            undefined,
+            reject
+        );
+    });
+}
+
+function resetMixer(): void {
+    if (!rootModel) return;
+    if (mixer) mixer.stopAllAction();
+    mixer = new THREE.AnimationMixer(rootModel);
+    currentAction = null;
+}
+
+function crossfadeTo(clip: THREE.AnimationClip, fadeDuration = 0.3): THREE.AnimationAction {
+    if (!mixer || !rootModel) throw new Error('Mixer not ready');
+    const next = mixer.clipAction(clip, rootModel);
+    next.reset();
+    next.enabled = true;
+    next.setEffectiveTimeScale(1);
+    next.setEffectiveWeight(1);
+    next.play();
+    if (currentAction && currentAction !== next) {
+        currentAction.crossFadeTo(next, fadeDuration, true);
+    }
+    currentAction = next;
+    return next;
+}
+
+function playIdle(): void {
+    if (!idleClip || !mixer || !rootModel) return;
+    sequenceToken++;
+    clearActiveBtn();
+    const action = crossfadeTo(idleClip, 0.6);
+    action.setLoop(THREE.LoopRepeat, Infinity);
+}
+
+function playSequence(button: AnimationButton, btn: HTMLButtonElement, pair?: HTMLButtonElement[]): void {
+    const clips = button.sequence.map((f) => clipCache.get(f));
+    if (clips.some((c) => !c)) {
+        console.warn('Clips not loaded yet — try again in a moment.');
+        return;
+    }
+
+    sequenceToken++;
+    const myToken = sequenceToken;
+    resetMixer();
+    setActiveBtn(btn, pair);
+
+    let index = 0;
+
+    const playNext = (): void => {
+        if (myToken !== sequenceToken) return;
+
+        if (index >= clips.length) {
+            if (button.loop) { index = 0; playNext(); }
+            else { playIdle(); }
+            return;
+        }
+
+        const clip = clips[index]!;
+        const fadeDuration = index === 0 ? (button.fadeIn ?? 0.3) : 0.2;
+        const action = crossfadeTo(clip, fadeDuration);
+        action.setLoop(THREE.LoopOnce, 1);
+        action.clampWhenFinished = true;
+        index++;
+
+        const onFinished = (e: THREE.Event): void => {
+            const event = e as unknown as { action: THREE.AnimationAction };
+            if (event.action !== action) return;
+            mixer!.removeEventListener('finished', onFinished as (e: THREE.Event) => void);
+            playNext();
+        };
+        mixer!.addEventListener('finished', onFinished as (e: THREE.Event) => void);
+    };
+
+    playNext();
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  LOAD BASE MODEL
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 const overlay = createLoadingOverlay();
 
 loader.load(
-    '/elmo.fbx',
+    BASE_MODEL,
 
     (fbx: THREE.Group) => {
-        fbx.scale.setScalar(0.1);
-
+        fbx.scale.setScalar(0.2);
         fbx.traverse((child: THREE.Object3D) => {
             if ((child as THREE.Mesh).isMesh) {
                 const mesh = child as THREE.Mesh;
@@ -79,7 +216,6 @@ loader.load(
             }
         });
 
-        // Center model above ground
         const box = new THREE.Box3().setFromObject(fbx);
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
@@ -88,23 +224,26 @@ loader.load(
         fbx.position.y -= box.min.y;
 
         scene.add(fbx);
+        rootModel = fbx;
+        mixer = new THREE.AnimationMixer(fbx);
 
-        // Animations
-        if (fbx.animations?.length > 0) {
-            mixer = new THREE.AnimationMixer(fbx);
-            mixer.clipAction(fbx.animations[0]).play();
-            if (fbx.animations.length > 1) {
-                buildAnimationUI(fbx.animations, mixer);
-            }
+        if (fbx.animations.length > 0) {
+            idleClip = fbx.animations[0];
+            currentAction = mixer.clipAction(idleClip);
+            currentAction.setLoop(THREE.LoopRepeat, Infinity);
+            currentAction.play();
         }
 
-        // Fit camera to model size
         const maxDim = Math.max(size.x, size.y, size.z);
-        camera.position.set(0, maxDim * 0.8, maxDim * 2);
-        controls.target.set(0, size.y / 2, 0);
+        // Position camera to nicely frame the model
+        camera.position.set(0, size.y * 0.5, maxDim * 1.8);
+        controls.target.set(0, size.y * 0.4, 0);
         controls.update();
 
+        BUTTONS.forEach((b) => b.sequence.forEach(preloadClip));
+
         removeOverlay(overlay);
+        buildUI();
     },
 
     (xhr: ProgressEvent) => {
@@ -122,7 +261,10 @@ loader.load(
     }
 );
 
-// ─── Render Loop ─────────────────────────────────────────────────────────────
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  RENDER LOOP
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 function animate(): void {
     requestAnimationFrame(animate);
     const delta = clock.getDelta();
@@ -132,19 +274,26 @@ function animate(): void {
 }
 animate();
 
-// ─── Resize ──────────────────────────────────────────────────────────────────
-window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-});
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  UI
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-// ─── UI Helpers ──────────────────────────────────────────────────────────────
+function setActiveBtn(btn: HTMLButtonElement, pair?: HTMLButtonElement[]): void {
+    clearActiveBtn();
+    activePair = pair ?? [btn];
+    activePair.forEach((b) => b.classList.add('active'));
+}
+
+function clearActiveBtn(): void {
+    activePair.forEach((b) => b.classList.remove('active'));
+    activePair = [];
+}
+
 function createLoadingOverlay(): HTMLDivElement {
     const div = document.createElement('div');
     div.id = 'loader';
     div.innerHTML = `<div class="spinner"></div><p id="load-pct">Loading...</p>`;
-    document.body.appendChild(div);
+    container.appendChild(div);
     return div;
 }
 
@@ -153,26 +302,19 @@ function removeOverlay(el: HTMLElement): void {
     setTimeout(() => el.remove(), 500);
 }
 
-function buildAnimationUI(
-    animations: THREE.AnimationClip[],
-    mixer: THREE.AnimationMixer
-): void {
-    const ui = document.createElement('div');
-    ui.id = 'anim-ui';
-    ui.innerHTML = '<strong>Animations</strong>';
+function buildUI(): void {
+    const mobileUi = document.getElementById('anim-ui')!;
+    const desktopUi = document.getElementById('anim-ui-desktop')!;
 
-    animations.forEach((clip: THREE.AnimationClip, i: number) => {
-        const btn = document.createElement('button');
-        btn.textContent = clip.name || `Clip ${i + 1}`;
-        btn.addEventListener('click', () => {
-            mixer.stopAllAction();
-            mixer.clipAction(clip).play();
-            ui.querySelectorAll('button').forEach((b) => b.classList.remove('active'));
-            btn.classList.add('active');
+    BUTTONS.forEach((config) => {
+        const pair: HTMLButtonElement[] = [];
+
+        [mobileUi, desktopUi].forEach((ui) => {
+            const btn = document.createElement('button');
+            btn.textContent = config.label;
+            btn.addEventListener('click', () => playSequence(config, btn, pair));
+            pair.push(btn);
+            ui.appendChild(btn);
         });
-        if (i === 0) btn.classList.add('active');
-        ui.appendChild(btn);
     });
-
-    document.body.appendChild(ui);
 }

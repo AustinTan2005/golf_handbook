@@ -6,8 +6,7 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": [
       "node",
-      "vite/client",
-      "three"
+      "vite/client"
     ],
     "skipLibCheck": true,
 
